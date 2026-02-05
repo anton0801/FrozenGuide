@@ -1,68 +1,116 @@
 import SwiftUI
 
 struct ActivityView: View {
+    @EnvironmentObject var activityViewModel: ActivityViewModel
+    @EnvironmentObject var fishViewModel: FishViewModel
+    
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    Text("Fish")
-                        .font(.headline)
-                        .foregroundColor(.lightCyan)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 16)
-                    Text("Morning")
-                        .font(.headline)
-                        .foregroundColor(.lightCyan)
-                        .frame(maxWidth: .infinity)
-                    Text("Day")
-                        .font(.headline)
-                        .foregroundColor(.lightCyan)
-                        .frame(maxWidth: .infinity)
-                    Text("Evening")
-                        .font(.headline)
-                        .foregroundColor(.lightCyan)
-                        .frame(maxWidth: .infinity)
-                        .padding(.trailing, 16)
-                }
-                .padding(.vertical, 12)
-                .background(Color.frostedBlue.opacity(0.9))
+        NavigationView {
+            ZStack {
+                Color.midnightIce.ignoresSafeArea()
                 
-                ForEach(activities) { activity in
-                    HStack(spacing: 0) {
-                        Text(activity.fishName)
-                            .foregroundColor(.iceWhiteGlow)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 16)
-                        Circle()
-                            .fill(colorForActivityLevel(activity.morning))
-                            .frame(width: 24, height: 24)
-                            .frame(maxWidth: .infinity)
-                        Circle()
-                            .fill(colorForActivityLevel(activity.day))
-                            .frame(width: 24, height: 24)
-                            .frame(maxWidth: .infinity)
-                        Circle()
-                            .fill(colorForActivityLevel(activity.evening))
-                            .frame(width: 24, height: 24)
-                            .frame(maxWidth: .infinity)
-                            .padding(.trailing, 16)
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Header
+                        headerView
+                        
+                        // Activity table
+                        if !activityViewModel.activitySlots.isEmpty {
+                            activityTable
+                        }
                     }
-                    .padding(.vertical, 12)
-                    .background(Color.frostedBlue.opacity(0.6))
-                    
-                    // Divider().background(.midnightIce)
+                    .padding()
                 }
             }
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.3), radius: 8)
-            .padding()
+            .navigationTitle("Fish Activity")
+            .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                if activityViewModel.activitySlots.isEmpty {
+                    activityViewModel.generateActivityTable(from: fishViewModel.fishes)
+                }
+            }
         }
-        .background(Color.midnightIce.ignoresSafeArea())
-        .navigationTitle("Activity")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationViewStyle(StackNavigationViewStyle())
+    }
+    
+    var headerView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "chart.bar.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.iceCyan)
+            
+            Text("Daily Activity Patterns")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.iceWhite)
+            
+            Text("Track when fish are most active")
+                .font(.system(size: 14))
+                .foregroundColor(.iceWhite.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.frostedBlue)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.iceWhite.opacity(0.1), lineWidth: 1)
+                )
+        )
+    }
+    
+    var activityTable: some View {
+        VStack(spacing: 16) {
+            ForEach(fishViewModel.fishes) { fish in
+                FishActivityRow(
+                    fish: fish,
+                    timeSlots: activityViewModel.activitySlots
+                )
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.frostedBlue)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.iceWhite.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 }
 
-#Preview {
-    ActivityView()
+struct FishActivityRow: View {
+    let fish: Fish
+    let timeSlots: [ActivityTimeSlot]
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: fish.iconName)
+                    .font(.system(size: 20))
+                    .foregroundColor(.iceCyan)
+                    .frame(width: 30)
+                
+                Text(fish.name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.iceWhite)
+                
+                Spacer()
+            }
+            
+            HStack(spacing: 12) {
+                ForEach(timeSlots) { slot in
+                    if let activity = slot.fishActivities[fish.id] {
+                        ActivityIndicator(level: activity)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.midnightIce.opacity(0.5))
+        )
+    }
 }

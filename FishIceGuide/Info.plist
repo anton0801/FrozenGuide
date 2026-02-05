@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+		<string>remote-notification</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Frozen Guide needs your location to provide accurate weather conditions, find nearby fishing spots, and log your catch locations.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Frozen Guide needs your location to track your fishing trips and provide weather alerts even when the app is in the background.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>WeatherUpdate</key>
+		<string>We need your precise location to provide accurate local weather and fishing conditions.</string>
+		<key>LogCatch</key>
+		<string>Allow precise location to accurately mark where you caught your fish.</string>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Frozen Guide needs access to your camera to take photos.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Frozen Guide may use limited technical information from your device to support navigation features, maintain service reliability, and improve overall app performance. This data is handled only for internal analysis and quality improvement and is not used to follow users across other apps or websites, nor shared for third-party advertising.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Frozen Guide needs access to your photo library to attach photos to your catch logs.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Frozen Guide needs permission to save photos of your catches to your photo library.</string>
+</dict>
+</plist>
