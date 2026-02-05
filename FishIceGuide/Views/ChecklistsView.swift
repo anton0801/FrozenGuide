@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct ChecklistsView: View {
     @StateObject private var viewModel = ChecklistViewModel()
@@ -150,6 +151,71 @@ struct ChecklistPreviewCard: View {
         case .safety: return "shield.fill"
         case .comfort: return "house.fill"
         case .advanced: return "wand.and.stars"
+        }
+    }
+}
+
+
+extension Navigator: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let dest = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+        prev = dest
+        if allowed(dest) {
+            decisionHandler(.allow)
+        } else {
+            UIApplication.shared.open(dest, options: [:])
+            decisionHandler(.cancel)
+        }
+    }
+    
+    private func allowed(_ url: URL) -> Bool {
+        let scheme = (url.scheme ?? "").lowercased()
+        let str = url.absoluteString.lowercased()
+        let schemes: Set<String> = ["http", "https", "about", "blob", "data", "javascript", "file"]
+        let special = ["srcdoc", "about:blank", "about:srcdoc"]
+        return schemes.contains(scheme) || special.contains { str.hasPrefix($0) } || str == "about:blank"
+    }
+    
+    func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+        count += 1
+        if count > max {
+            webView.stopLoading()
+            if let recovery = prev { webView.load(URLRequest(url: recovery)) }
+            count = 0
+            return
+        }
+        prev = webView.url
+        saveCookies(from: webView)
+    }
+    
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        if let curr = webView.url {
+            safe = curr
+            print("✅ [Frozen] Commit: \(curr.absoluteString)")
+        }
+    }
+    
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if let curr = webView.url { safe = curr }
+        count = 0
+        saveCookies(from: webView)
+    }
+    
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let code = (error as NSError).code
+        if code == NSURLErrorHTTPTooManyRedirects, let recovery = prev {
+            webView.load(URLRequest(url: recovery))
+        }
+    }
+    
+    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.performDefaultHandling, nil)
         }
     }
 }

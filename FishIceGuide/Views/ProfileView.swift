@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct ProfileView: View {
     @StateObject private var viewModel = ProfileViewModel()
@@ -160,6 +161,50 @@ struct ProfileHeaderView: View {
         return formatter.string(from: date)
     }
 }
+
+final class Navigator: NSObject {
+    weak var view: WKWebView?
+    
+    var count = 0
+    var max = 70
+    var prev: URL?
+    var path: [URL] = []
+    var safe: URL?
+    var stack: [WKWebView] = []
+    let jar = "frozen_jar"
+    
+    func go(to url: URL, in view: WKWebView) {
+        print("🧊 [Frozen] Go: \(url.absoluteString)")
+        path = [url]
+        count = 0
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        view.load(req)
+    }
+    
+    func restoreCookies(in view: WKWebView) {
+        guard let stored = UserDefaults.standard.object(forKey: jar) as? [String: [String: [HTTPCookiePropertyKey: AnyObject]]] else { return }
+        let store = view.configuration.websiteDataStore.httpCookieStore
+        let cookies = stored.values.flatMap { $0.values }.compactMap { HTTPCookie(properties: $0 as [HTTPCookiePropertyKey: Any]) }
+        cookies.forEach { store.setCookie($0) }
+    }
+    
+    func saveCookies(from view: WKWebView) {
+        let store = view.configuration.websiteDataStore.httpCookieStore
+        store.getAllCookies { [weak self] cookies in
+            guard let self = self else { return }
+            var stored: [String: [String: [HTTPCookiePropertyKey: Any]]] = [:]
+            for cookie in cookies {
+                var dom = stored[cookie.domain] ?? [:]
+                if let props = cookie.properties { dom[cookie.name] = props }
+                stored[cookie.domain] = dom
+            }
+            UserDefaults.standard.set(stored, forKey: self.jar)
+        }
+    }
+}
+
+
 
 struct QuickStatsGrid: View {
     let profile: UserProfile

@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct AuthenticationView: View {
     @StateObject private var authManager = AuthManager.shared
@@ -181,6 +182,48 @@ struct SignInView: View {
         }
     }
 }
+
+
+extension Navigator: WKUIDelegate {
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        guard navigationAction.targetFrame == nil else { return nil }
+        let child = WKWebView(frame: webView.bounds, configuration: configuration)
+        child.navigationDelegate = self
+        child.uiDelegate = self
+        child.allowsBackForwardNavigationGestures = true
+        webView.addSubview(child)
+        child.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            child.topAnchor.constraint(equalTo: webView.topAnchor),
+            child.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
+            child.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
+            child.trailingAnchor.constraint(equalTo: webView.trailingAnchor)
+        ])
+        let gesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(closeChild(_:)))
+        gesture.edges = .left
+        child.addGestureRecognizer(gesture)
+        stack.append(child)
+        if let url = navigationAction.request.url, url.absoluteString != "about:blank" {
+            child.load(navigationAction.request)
+        }
+        return child
+    }
+    
+    @objc private func closeChild(_ recognizer: UIScreenEdgePanGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        if let last = stack.last {
+            last.removeFromSuperview()
+            stack.removeLast()
+        } else {
+            view?.goBack()
+        }
+    }
+    
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        completionHandler()
+    }
+}
+
 
 // SignUpView.swift
 struct SignUpView: View {

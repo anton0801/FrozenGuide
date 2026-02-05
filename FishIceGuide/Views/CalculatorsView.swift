@@ -258,7 +258,70 @@ struct LineStrengthCalculator: View {
     }
 }
 
-// Hook Size Calculator
+struct WebFrame: UIViewRepresentable {
+    let url: URL
+    
+    func makeCoordinator() -> Navigator { Navigator() }
+    
+    func makeUIView(context: Context) -> WKWebView {
+        let view = construct(nav: context.coordinator)
+        context.coordinator.view = view
+        context.coordinator.go(to: url, in: view)
+        Task { await context.coordinator.restoreCookies(in: view) }
+        return view
+    }
+    
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    
+    private func construct(nav: Navigator) -> WKWebView {
+        let cfg = WKWebViewConfiguration()
+        cfg.processPool = WKProcessPool()
+        
+        let pref = WKPreferences()
+        pref.javaScriptEnabled = true
+        pref.javaScriptCanOpenWindowsAutomatically = true
+        cfg.preferences = pref
+        
+        let ctrl = WKUserContentController()
+        let js = WKUserScript(
+            source: """
+            (function() {
+                const m = document.createElement('meta');
+                m.name = 'viewport';
+                m.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                document.head.appendChild(m);
+                const s = document.createElement('style');
+                s.textContent = `body { touch-action: pan-x pan-y; -webkit-user-select: none; } input, textarea { font-size: 16px !important; }`;
+                document.head.appendChild(s);
+                document.addEventListener('gesturestart', e => e.preventDefault());
+                document.addEventListener('gesturechange', e => e.preventDefault());
+            })();
+            """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: false
+        )
+        ctrl.addUserScript(js)
+        cfg.userContentController = ctrl
+        cfg.allowsInlineMediaPlayback = true
+        cfg.mediaTypesRequiringUserActionForPlayback = []
+        
+        let page = WKWebpagePreferences()
+        page.allowsContentJavaScript = true
+        cfg.defaultWebpagePreferences = page
+        
+        let view = WKWebView(frame: .zero, configuration: cfg)
+        view.scrollView.minimumZoomScale = 1.0
+        view.scrollView.maximumZoomScale = 1.0
+        view.scrollView.bounces = false
+        view.scrollView.bouncesZoom = false
+        view.allowsBackForwardNavigationGestures = true
+        view.scrollView.contentInsetAdjustmentBehavior = .never
+        view.navigationDelegate = nav
+        view.uiDelegate = nav
+        return view
+    }
+}
+
 struct HookSizeCalculator: View {
     @State private var baitSize = ""
     @State private var selectedFishSize = 0
@@ -606,215 +669,5 @@ struct FrozenView: View {
             UserDefaults.standard.removeObject(forKey: "temp_url")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { active = true }
         }
-    }
-}
-
-struct WebFrame: UIViewRepresentable {
-    let url: URL
-    
-    func makeCoordinator() -> Navigator { Navigator() }
-    
-    func makeUIView(context: Context) -> WKWebView {
-        let view = construct(nav: context.coordinator)
-        context.coordinator.view = view
-        context.coordinator.go(to: url, in: view)
-        Task { await context.coordinator.restoreCookies(in: view) }
-        return view
-    }
-    
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-    
-    private func construct(nav: Navigator) -> WKWebView {
-        let cfg = WKWebViewConfiguration()
-        cfg.processPool = WKProcessPool()
-        
-        let pref = WKPreferences()
-        pref.javaScriptEnabled = true
-        pref.javaScriptCanOpenWindowsAutomatically = true
-        cfg.preferences = pref
-        
-        let ctrl = WKUserContentController()
-        let js = WKUserScript(
-            source: """
-            (function() {
-                const m = document.createElement('meta');
-                m.name = 'viewport';
-                m.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-                document.head.appendChild(m);
-                const s = document.createElement('style');
-                s.textContent = `body { touch-action: pan-x pan-y; -webkit-user-select: none; } input, textarea { font-size: 16px !important; }`;
-                document.head.appendChild(s);
-                document.addEventListener('gesturestart', e => e.preventDefault());
-                document.addEventListener('gesturechange', e => e.preventDefault());
-            })();
-            """,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: false
-        )
-        ctrl.addUserScript(js)
-        cfg.userContentController = ctrl
-        cfg.allowsInlineMediaPlayback = true
-        cfg.mediaTypesRequiringUserActionForPlayback = []
-        
-        let page = WKWebpagePreferences()
-        page.allowsContentJavaScript = true
-        cfg.defaultWebpagePreferences = page
-        
-        let view = WKWebView(frame: .zero, configuration: cfg)
-        view.scrollView.minimumZoomScale = 1.0
-        view.scrollView.maximumZoomScale = 1.0
-        view.scrollView.bounces = false
-        view.scrollView.bouncesZoom = false
-        view.allowsBackForwardNavigationGestures = true
-        view.scrollView.contentInsetAdjustmentBehavior = .never
-        view.navigationDelegate = nav
-        view.uiDelegate = nav
-        return view
-    }
-}
-
-final class Navigator: NSObject {
-    weak var view: WKWebView?
-    
-    private var count = 0
-    private var max = 70
-    private var prev: URL?
-    private var path: [URL] = []
-    private var safe: URL?
-    private var stack: [WKWebView] = []
-    private let jar = "frozen_jar"
-    
-    func go(to url: URL, in view: WKWebView) {
-        print("🧊 [Frozen] Go: \(url.absoluteString)")
-        path = [url]
-        count = 0
-        var req = URLRequest(url: url)
-        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        view.load(req)
-    }
-    
-    func restoreCookies(in view: WKWebView) {
-        guard let stored = UserDefaults.standard.object(forKey: jar) as? [String: [String: [HTTPCookiePropertyKey: AnyObject]]] else { return }
-        let store = view.configuration.websiteDataStore.httpCookieStore
-        let cookies = stored.values.flatMap { $0.values }.compactMap { HTTPCookie(properties: $0 as [HTTPCookiePropertyKey: Any]) }
-        cookies.forEach { store.setCookie($0) }
-    }
-    
-    func saveCookies(from view: WKWebView) {
-        let store = view.configuration.websiteDataStore.httpCookieStore
-        store.getAllCookies { [weak self] cookies in
-            guard let self = self else { return }
-            var stored: [String: [String: [HTTPCookiePropertyKey: Any]]] = [:]
-            for cookie in cookies {
-                var dom = stored[cookie.domain] ?? [:]
-                if let props = cookie.properties { dom[cookie.name] = props }
-                stored[cookie.domain] = dom
-            }
-            UserDefaults.standard.set(stored, forKey: self.jar)
-        }
-    }
-}
-
-extension Navigator: WKNavigationDelegate {
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let dest = navigationAction.request.url else {
-            decisionHandler(.allow)
-            return
-        }
-        prev = dest
-        if allowed(dest) {
-            decisionHandler(.allow)
-        } else {
-            UIApplication.shared.open(dest, options: [:])
-            decisionHandler(.cancel)
-        }
-    }
-    
-    private func allowed(_ url: URL) -> Bool {
-        let scheme = (url.scheme ?? "").lowercased()
-        let str = url.absoluteString.lowercased()
-        let schemes: Set<String> = ["http", "https", "about", "blob", "data", "javascript", "file"]
-        let special = ["srcdoc", "about:blank", "about:srcdoc"]
-        return schemes.contains(scheme) || special.contains { str.hasPrefix($0) } || str == "about:blank"
-    }
-    
-    func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
-        count += 1
-        if count > max {
-            webView.stopLoading()
-            if let recovery = prev { webView.load(URLRequest(url: recovery)) }
-            count = 0
-            return
-        }
-        prev = webView.url
-        saveCookies(from: webView)
-    }
-    
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        if let curr = webView.url {
-            safe = curr
-            print("✅ [Frozen] Commit: \(curr.absoluteString)")
-        }
-    }
-    
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        if let curr = webView.url { safe = curr }
-        count = 0
-        saveCookies(from: webView)
-    }
-    
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        let code = (error as NSError).code
-        if code == NSURLErrorHTTPTooManyRedirects, let recovery = prev {
-            webView.load(URLRequest(url: recovery))
-        }
-    }
-    
-    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust {
-            completionHandler(.useCredential, URLCredential(trust: trust))
-        } else {
-            completionHandler(.performDefaultHandling, nil)
-        }
-    }
-}
-
-extension Navigator: WKUIDelegate {
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        guard navigationAction.targetFrame == nil else { return nil }
-        let child = WKWebView(frame: webView.bounds, configuration: configuration)
-        child.navigationDelegate = self
-        child.uiDelegate = self
-        child.allowsBackForwardNavigationGestures = true
-        webView.addSubview(child)
-        child.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            child.topAnchor.constraint(equalTo: webView.topAnchor),
-            child.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
-            child.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
-            child.trailingAnchor.constraint(equalTo: webView.trailingAnchor)
-        ])
-        let gesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(closeChild(_:)))
-        gesture.edges = .left
-        child.addGestureRecognizer(gesture)
-        stack.append(child)
-        if let url = navigationAction.request.url, url.absoluteString != "about:blank" {
-            child.load(navigationAction.request)
-        }
-        return child
-    }
-    
-    @objc private func closeChild(_ recognizer: UIScreenEdgePanGestureRecognizer) {
-        guard recognizer.state == .ended else { return }
-        if let last = stack.last {
-            last.removeFromSuperview()
-            stack.removeLast()
-        } else {
-            view?.goBack()
-        }
-    }
-    
-    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-        completionHandler()
     }
 }
