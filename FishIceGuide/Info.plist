@@ -21,8 +21,17 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Frozen Guide needs access to your camera to take photos.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Frozen Guide may use limited technical information from your device to support navigation features, maintain service reliability, and improve overall app performance. This data is handled only for internal analysis and quality improvement and is not used to follow users across other apps or websites, nor shared for third-party advertising.</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>co.figuides.FishIceGuide.background</string>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Frozen Guide needs access to your photo library to attach photos to your catch logs.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
